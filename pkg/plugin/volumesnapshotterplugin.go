@@ -84,5 +84,22 @@ func (vs *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (s
 // SetVolumeID sets the specific identifier for the PersistentVolume.
 func (vs *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	vs.Log.Infof("SetVolumeID called", unstructuredPV, volumeID)
-	return &unstructured.Unstructured{}, nil
+
+	pv := new(corev1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if pv.Spec.CSI == nil {
+		return nil, fmt.Errorf("spec.CSI not found from pv %+v", pv)
+	}
+
+	pv.Spec.CSI.VolumeHandle = volumeID
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &unstructured.Unstructured{Object: res}, nil
 }
