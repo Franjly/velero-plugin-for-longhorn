@@ -1,9 +1,13 @@
 package plugin
 
 import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -62,7 +66,19 @@ func (vs *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 // GetVolumeID returns the specific identifier for the PersistentVolume.
 func (vs *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
 	vs.Log.Infof("GetVolumeID called", unstructuredPV)
-	return "", nil
+
+	pv := new(corev1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.CSI == nil {
+		return "", fmt.Errorf("unable to retrieve CSI Spec from pv %+v", pv)
+	}
+	if pv.Spec.CSI.VolumeHandle == "" {
+		return "", fmt.Errorf("unable to retrieve Volume handle from pv %+v", pv)
+	}
+	return pv.Spec.CSI.VolumeHandle, nil
 }
 
 // SetVolumeID sets the specific identifier for the PersistentVolume.
