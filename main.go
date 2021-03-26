@@ -9,7 +9,7 @@ import (
 
 func main() {
 	veleroplugin.NewServer().
-		RegisterVolumeSnapshotter("longhorn.io/volume-snapshotter-plugin", newVolumeSnapshotterPlugin).
+		RegisterVolumeSnapshotter("longhorn.io/longhorn", newVolumeSnapshotterPlugin).
 		Serve()
 }
 
