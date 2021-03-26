@@ -25,7 +25,6 @@ func NewVolumeSnapshotter(log logrus.FieldLogger) *VolumeSnapshotter {
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config. Note that after v0.10.0, this will happen multiple times.
 func (vs *VolumeSnapshotter) Init(config map[string]string) error {
-	vs.Log.Infof("Init longhorn plugin with config: %v", config)
 	return nil
 }
 
@@ -34,6 +33,7 @@ func (vs *VolumeSnapshotter) Init(config map[string]string) error {
 // and with the specified type and IOPS (if using provisioned IOPS).
 func (vs *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	vs.Log.Infof("CreateVolumeFromSnapshot for snapshotID: %s, volumeType: %s, volumeAZ: %s, iops: %v", snapshotID, volumeType, volumeAZ, *iops)
+	// TODO
 	return "", nil
 }
 
@@ -41,12 +41,14 @@ func (vs *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vo
 // the specified volume in the given availability zone.
 func (vs *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	vs.Log.Infof("GetVolumeInfo for volumeID: %s, volumeAZ: %s", volumeID, volumeAZ)
+	// TODP
 	return "", nil, nil
 }
 
 // IsVolumeReady Check if the volume is ready.
 func (vs *VolumeSnapshotter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	vs.Log.Infof("IsVolumeReady for volumeID: %s, volumeAZ: %s", volumeID, volumeAZ)
+	// TODO
 	return true, nil
 }
 
@@ -54,19 +56,19 @@ func (vs *VolumeSnapshotter) IsVolumeReady(volumeID, volumeAZ string) (ready boo
 // set of tags to the snapshot.
 func (vs *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	vs.Log.Infof("CreateSnapshot for volumeID: %s, volumeAZ: %s, tags: %v", volumeID, volumeAZ, tags)
+	// TODO
 	return "", nil
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
 func (vs *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	vs.Log.Infof("DeleteSnapshot for snapshotID: %s", snapshotID)
+	// TODO
 	return nil
 }
 
 // GetVolumeID returns the specific identifier for the PersistentVolume.
 func (vs *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
-	vs.Log.Infof("GetVolumeID for %v", unstructuredPV)
-
 	pv := new(corev1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return "", errors.WithStack(err)
@@ -83,8 +85,6 @@ func (vs *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (s
 
 // SetVolumeID sets the specific identifier for the PersistentVolume.
 func (vs *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	vs.Log.Infof("SetVolumeID for %+v with volumeID: %s", unstructuredPV, volumeID)
-
 	pv := new(corev1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return nil, errors.WithStack(err)
@@ -99,6 +99,5 @@ func (vs *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, vo
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-
 	return &unstructured.Unstructured{Object: res}, nil
 }
