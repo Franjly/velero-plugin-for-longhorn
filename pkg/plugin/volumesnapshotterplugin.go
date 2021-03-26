@@ -4,8 +4,11 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -13,7 +16,8 @@ import (
 
 // VolumeSnapshotter is a plugin for containing state for the longhorn volume
 type VolumeSnapshotter struct {
-	Log logrus.FieldLogger
+	Log     logrus.FieldLogger
+	kClient *kubernetes.Clientset
 }
 
 // NewVolumeSnapshotter instantiates a NewVolumeSnapshotter.
@@ -25,6 +29,15 @@ func NewVolumeSnapshotter(log logrus.FieldLogger) *VolumeSnapshotter {
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config. Note that after v0.10.0, this will happen multiple times.
 func (vs *VolumeSnapshotter) Init(config map[string]string) error {
+	clusterConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("Error to retrieve in cluster config: %v", err)
+	}
+	kClient, err := kubernetes.NewForConfig(clusterConfig)
+	if err != nil {
+		return fmt.Errorf("Error to retrieve kubernetes client: %v", err)
+	}
+	vs.kClient = kClient
 	return nil
 }
 
@@ -41,8 +54,18 @@ func (vs *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vo
 // the specified volume in the given availability zone.
 func (vs *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	vs.Log.Infof("GetVolumeInfo for volumeID: %s, volumeAZ: %s", volumeID, volumeAZ)
-	// TODP
-	return "", nil, nil
+	pv, err := vs.kClient.CoreV1().PersistentVolumes().Get(volumeID, metav1.GetOptions{})
+	if err != nil {
+		return "", nil, fmt.Errorf("Unable to retrieve pv from %s", volumeID)
+	}
+
+	if pv.Spec.CSI == nil {
+		return "", nil, fmt.Errorf("Unable to retrieve csi Spec from pv %+v", pv)
+	}
+	if pv.Spec.CSI.FSType == "" {
+		return "", nil, fmt.Errorf("Unable to retrieve fs type from pv %+v", pv)
+	}
+	return pv.Spec.CSI.FSType, nil, nil
 }
 
 // IsVolumeReady Check if the volume is ready.
@@ -75,10 +98,10 @@ func (vs *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (s
 	}
 
 	if pv.Spec.CSI == nil {
-		return "", fmt.Errorf("unable to retrieve CSI Spec from pv %+v", pv)
+		return "", fmt.Errorf("Unable to retrieve csi spec from pv %+v", pv)
 	}
 	if pv.Spec.CSI.VolumeHandle == "" {
-		return "", fmt.Errorf("unable to retrieve Volume handle from pv %+v", pv)
+		return "", fmt.Errorf("Unable to retrieve volume handle from pv %+v", pv)
 	}
 	return pv.Spec.CSI.VolumeHandle, nil
 }
@@ -91,7 +114,7 @@ func (vs *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, vo
 	}
 
 	if pv.Spec.CSI == nil {
-		return nil, fmt.Errorf("spec.CSI not found from pv %+v", pv)
+		return nil, fmt.Errorf("Unable to retrieve csi spec from pv %+v", pv)
 	}
 
 	pv.Spec.CSI.VolumeHandle = volumeID
