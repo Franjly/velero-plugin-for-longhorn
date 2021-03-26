@@ -68,13 +68,6 @@ func (vs *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *
 	return pv.Spec.CSI.FSType, nil, nil
 }
 
-// IsVolumeReady Check if the volume is ready.
-func (vs *VolumeSnapshotter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	vs.Log.Infof("IsVolumeReady for volumeID: %s, volumeAZ: %s", volumeID, volumeAZ)
-	// TODO
-	return true, nil
-}
-
 // CreateSnapshot creates a snapshot of the specified volume, and applies any provided
 // set of tags to the snapshot.
 func (vs *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
