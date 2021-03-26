@@ -1,7 +1,11 @@
 package plugin
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +16,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	backendServiceURL = "http://longhorn-backend.longhorn-system.svc:9500"
 )
 
 // VolumeSnapshotter is a plugin for containing state for the longhorn volume
@@ -72,8 +80,46 @@ func (vs *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *
 // set of tags to the snapshot.
 func (vs *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	vs.Log.Infof("CreateSnapshot for volumeID: %s, volumeAZ: %s, tags: %v", volumeID, volumeAZ, tags)
-	// TODO
-	return "", nil
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/v1/volumes/%s?action=snapshotCreate", backendServiceURL, volumeID),
+		strings.NewReader(`{}`))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Unexpected response code: %d", resp.StatusCode)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	type response struct {
+		ID   string `json:"id,omitempty"`
+		Name string `json:"name,omitempty"`
+	}
+	r := &response{}
+	if err := json.Unmarshal(body, r); err != nil {
+		return "", err
+	}
+
+	if r.ID != "" {
+		return r.ID, nil
+	}
+	if r.Name != "" {
+		return r.Name, nil
+	}
+	return "", fmt.Errorf("Empty snapshot ID")
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
