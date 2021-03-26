@@ -125,7 +125,30 @@ func (vs *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[
 // DeleteSnapshot deletes the specified volume snapshot.
 func (vs *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	vs.Log.Infof("DeleteSnapshot for snapshotID: %s", snapshotID)
-	// TODO
+
+	volumeID := ""
+	// TODO:
+	//   - List all volumes by http://longhorn-backend.longhorn-system.svc:9500/v1/volumes
+	//   - Loop all volumes to get the snapshot http://longhorn-backend.longhorn-system.svc:9500/v1/volumes/<volume-name>?action=snapshotGet
+	body := strings.NewReader(fmt.Sprintf("{name:%s}", snapshotID))
+	req, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/v1/volumes/%s?action=snapshotDelete", backendServiceURL, volumeID),
+		body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unexpected response code: %d", resp.StatusCode)
+	}
 	return nil
 }
 
