@@ -104,41 +104,38 @@ func (vs *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[
 		return "", err
 	}
 
-	type response struct {
+	type Response struct {
 		ID   string `json:"id,omitempty"`
 		Name string `json:"name,omitempty"`
 	}
-	r := &response{}
+	r := &Response{}
 	if err := json.Unmarshal(body, r); err != nil {
 		return "", err
 	}
 
-	if r.ID != "" {
-		return r.ID, nil
+	snapshotID := r.ID
+	if snapshotID == "" && r.Name != "" {
+		snapshotID = r.Name
 	}
-	if r.Name != "" {
-		return r.Name, nil
+	if snapshotID == "" {
+		return "", fmt.Errorf("Empty snapshot ID")
 	}
-	return "", fmt.Errorf("Empty snapshot ID")
+	vs.Log.Infof("CreateSnapshot for volumeID %s with snapshotID: %s", volumeID, snapshotID)
+	return snapshotID, nil
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
 func (vs *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	vs.Log.Infof("DeleteSnapshot for snapshotID: %s", snapshotID)
 
-	volumeID := ""
-	// TODO:
-	//   - List all volumes by http://longhorn-backend.longhorn-system.svc:9500/v1/volumes
-	//   - Loop all volumes to get the snapshot http://longhorn-backend.longhorn-system.svc:9500/v1/volumes/<volume-name>?action=snapshotGet
-	body := strings.NewReader(fmt.Sprintf("{name:%s}", snapshotID))
+	// List all volumes to find the snapshotID belongs to which volume
 	req, err := http.NewRequest(
-		http.MethodPost,
-		fmt.Sprintf("%s/v1/volumes/%s?action=snapshotDelete", backendServiceURL, volumeID),
-		body)
+		http.MethodGet,
+		fmt.Sprintf("%s/v1/volumes", backendServiceURL),
+		strings.NewReader(""))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -149,6 +146,80 @@ func (vs *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Unexpected response code: %d", resp.StatusCode)
 	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	type Actions struct {
+		SnapshotGet  string `json:"snapshotGet,omitempty"`
+		SnapshotList string `json:"snapshotList,omitempty"`
+	}
+	type Data struct {
+		Actions Actions `json:"actions,omitempty"`
+		ID      string  `json:"id,omitempty"`
+		Name    string  `json:"name,omitempty"`
+	}
+	type VolumeResponse struct {
+		Data []Data `json:"data,omitempty"`
+	}
+	volumeResponse := &VolumeResponse{}
+	if err := json.Unmarshal(body, volumeResponse); err != nil {
+		return err
+	}
+
+	volumeID := ""
+	for _, data := range volumeResponse.Data {
+		snapshotGetURL := data.Actions.SnapshotGet
+		req, err := http.NewRequest(
+			http.MethodGet,
+			snapshotGetURL,
+			strings.NewReader(fmt.Sprintf("{\"name\":\"%s\"}", snapshotID)))
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+		if data.ID != "" {
+			volumeID = data.ID
+		} else if data.Name != "" {
+			volumeID = data.Name
+		}
+		break
+	}
+
+	if volumeID == "" {
+		return fmt.Errorf("Cannot find the volume for snapshotID: %s", snapshotID)
+	}
+
+	// Find the volumeID for snapshotID, delete it
+	req, err = http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/v1/volumes/%s?action=snapshotDelete", backendServiceURL, volumeID),
+		strings.NewReader(fmt.Sprintf("{\"name\":\"%s\"}", snapshotID)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Unexpected response code: %d", resp.StatusCode)
+	}
+	vs.Log.Infof("DeleteSnapshot for snapshotID %s on volumeID %s", snapshotID, volumeID)
 	return nil
 }
 
