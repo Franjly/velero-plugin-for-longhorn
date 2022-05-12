@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -62,7 +63,7 @@ func (vs *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vo
 // the specified volume in the given availability zone.
 func (vs *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	vs.Log.Infof("GetVolumeInfo for volumeID: %s, volumeAZ: %s", volumeID, volumeAZ)
-	pv, err := vs.kClient.CoreV1().PersistentVolumes().Get(volumeID, metav1.GetOptions{})
+	pv, err := vs.kClient.CoreV1().PersistentVolumes().Get(context.TODO(), volumeID, metav1.GetOptions{})
 	if err != nil {
 		return "", nil, fmt.Errorf("Unable to retrieve pv from %s", volumeID)
 	}
