@@ -1,4 +1,4 @@
-FROM golang:1.16 AS builder
+FROM golang:1.18.2 AS builder
 ENV GOPROXY=https://proxy.golang.org
 WORKDIR /go/src/github.com/ecatlabs/velero-plugin
 COPY . .
