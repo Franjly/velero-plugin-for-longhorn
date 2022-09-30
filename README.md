@@ -22,7 +22,7 @@ Longhorn plugin for Velero. To take snapshots of Longhorn volumes through Velero
 
 2. Add Longhorn plugin to Velero server
    ```shell
-   velero plugin add quay.io/jenting/velero-plugin:main \
+   velero plugin add franjlytools/velero-plugin-for-longhorn \
        --image-pull-policy Always
    ```
 
